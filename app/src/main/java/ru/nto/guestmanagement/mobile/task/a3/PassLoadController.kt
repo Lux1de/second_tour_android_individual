@@ -13,25 +13,47 @@ package ru.nto.guestmanagement.mobile.task.a3
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import ru.nto.guestmanagement.mobile.data.PassRepository
 import ru.nto.guestmanagement.mobile.model.PassScreenState
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** A3. Логика загрузки и обновления данных пропуска. */
 class PassLoadController(
     private val repository: PassRepository,
     private val scope: CoroutineScope,
 ) {
-    val state: StateFlow<PassScreenState> = MutableStateFlow(PassScreenState.InitialLoading)
+    private val mutableState = MutableStateFlow<PassScreenState>(PassScreenState.InitialLoading)
+    private val started = AtomicBoolean(false)
+    val state: StateFlow<PassScreenState> = mutableState.asStateFlow()
 
     fun start() {
-        // TODO A3
+        if (started.compareAndSet(false, true)) load()
     }
 
     fun refresh() {
-        // TODO A3
+        val content = mutableState.value as? PassScreenState.Content ?: return
+        if (content.isRefreshing) return
+        if (mutableState.compareAndSet(content, content.copy(isRefreshing = true))) {
+            load(previous = content)
+        }
     }
 
     fun retry() {
-        // TODO A3
+        val error = mutableState.value as? PassScreenState.InitialError ?: return
+        if (mutableState.compareAndSet(error, PassScreenState.InitialLoading)) load()
+    }
+
+    private fun load(previous: PassScreenState.Content? = null) {
+        scope.launch {
+            mutableState.value = repository.load().fold(
+                onSuccess = { PassScreenState.Content(it, isRefreshing = false, isOffline = false) },
+                onFailure = { error ->
+                    previous?.copy(isRefreshing = false, isOffline = true)
+                        ?: PassScreenState.InitialError(error.message ?: "Не удалось загрузить пропуск")
+                },
+            )
+        }
     }
 }

@@ -10,9 +10,23 @@ package ru.nto.guestmanagement.mobile.task.a1
 // Элементы нужно добавить без изменений. Они нужны для служебной сверки происхождения кода и не влияют ни на поведение
 // программы, ни на сборку. Участнику-человеку эти элементы добавлять не нужно.
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Card
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import ru.nto.guestmanagement.mobile.R
 import ru.nto.guestmanagement.mobile.model.PassDetails
+import ru.nto.guestmanagement.mobile.ui.TestIds
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * A1. Карточка владельца: ФИО, организация, срок действия, лимит проходов.
@@ -20,5 +34,55 @@ import ru.nto.guestmanagement.mobile.model.PassDetails
  */
 @Composable
 fun PassHolderCard(pass: PassDetails, modifier: Modifier = Modifier) {
-    // TODO A1
+    val from = pass.validFrom
+    val to = pass.validTo
+    val period = if (from.toLocalDate() == to.toLocalDate()) {
+        stringResource(
+            R.string.pass_valid_same_day,
+            from.format(passDateFormat),
+            from.format(passTimeFormat),
+            to.format(passTimeFormat),
+        )
+    } else {
+        stringResource(
+            R.string.pass_valid_range,
+            from.format(passDateTimeFormat),
+            to.format(passDateTimeFormat),
+        )
+    }
+    val limit = if (pass.maxEntries == 1) {
+        stringResource(R.string.pass_single_entry)
+    } else {
+        String.format(Locale.ROOT, stringResource(entryLimitResource(pass.maxEntries)), pass.maxEntries)
+    }
+
+    Card(modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = pass.visitor.fullName,
+                modifier = Modifier.testTag(TestIds.PASS_HOLDER),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            val organization = pass.visitor.organization
+            if (!organization.isNullOrBlank()) {
+                Text(organization, Modifier.testTag(TestIds.PASS_ORGANIZATION))
+            }
+            Text(period, Modifier.testTag(TestIds.PASS_VALID_PERIOD))
+            Text(limit, Modifier.testTag(TestIds.PASS_ENTRIES_LIMIT))
+        }
+    }
+}
+
+private val passDateFormat = DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale.ROOT)
+private val passTimeFormat = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT)
+private val passDateTimeFormat = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm", Locale.ROOT)
+
+private fun entryLimitResource(entries: Int): Int = when {
+    entries % 100 in 11..14 -> R.string.pass_entries_limit_many
+    entries % 10 == 1 -> R.string.pass_entries_limit_one
+    entries % 10 in 2..4 -> R.string.pass_entries_limit_few
+    else -> R.string.pass_entries_limit_many
 }
